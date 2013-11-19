@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "OMXCodec"
 #include <utils/Log.h>
 
@@ -134,6 +134,10 @@ static void InitOMXParams(T *params) {
 
 static bool IsSoftwareCodec(const char *componentName) {
     if (!strncmp("OMX.google.", componentName, 11)) {
+        return true;
+    }
+
+    if (!strncmp("OMX.sprd.soft.", componentName, 14)) {
         return true;
     }
 
@@ -369,7 +373,9 @@ sp<MediaSource> OMXCodec::Create(
             }
 
             ALOGV("Failed to configure codec '%s'", componentName);
-        }
+        } else {
+	     ALOGI("Fail  allocated OMX node '%s'", componentName);
+	    }        
     }
 
     return NULL;
@@ -1709,6 +1715,7 @@ status_t OMXCodec::applyRotation() {
 status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
     // Get the number of buffers needed.
     OMX_PARAM_PORTDEFINITIONTYPE def;
+    OMX_COLOR_FORMATTYPE colorFormat;
     InitOMXParams(&def);
     def.nPortIndex = kPortIndexOutput;
 
@@ -1719,11 +1726,16 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
         return err;
     }
 
+	colorFormat = def.format.video.eColorFormat;
+	if(colorFormat == OMX_COLOR_FormatYUV420SemiPlanar) {
+	  colorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YCbCr_420_SP;
+    }
+
     err = native_window_set_buffers_geometry(
             mNativeWindow.get(),
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
-            def.format.video.eColorFormat);
+            colorFormat);
 
     if (err != 0) {
         ALOGE("native_window_set_buffers_geometry failed: %s (%d)",

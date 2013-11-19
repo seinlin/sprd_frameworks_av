@@ -10,11 +10,15 @@ LOCAL_SRC_FILES:=                     \
         SoftOMXComponent.cpp          \
         SoftOMXPlugin.cpp             \
         SoftVideoDecoderOMXComponent.cpp \
+	SprdSimpleOMXComponent.cpp    \
+        SprdOMXComponent.cpp          \
+        SprdOMXPlugin.cpp             \
 
 LOCAL_C_INCLUDES += \
         $(TOP)/frameworks/av/media/libstagefright \
         $(TOP)/frameworks/native/include/media/hardware \
-        $(TOP)/frameworks/native/include/media/openmax
+        $(TOP)/frameworks/native/include/media/openmax \
+	$(TOP)/frameworks/native/include/binder
 
 LOCAL_SHARED_LIBRARIES :=               \
         libbinder                       \

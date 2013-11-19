@@ -550,6 +550,7 @@ status_t ACodec::configureOutputBuffersFromNativeWindow(
         OMX_U32 *bufferCount, OMX_U32 *bufferSize,
         OMX_U32 *minUndequeuedBuffers) {
     OMX_PARAM_PORTDEFINITIONTYPE def;
+    OMX_COLOR_FORMATTYPE colorFormat;
     InitOMXParams(&def);
     def.nPortIndex = kPortIndexOutput;
 
@@ -560,11 +561,16 @@ status_t ACodec::configureOutputBuffersFromNativeWindow(
         return err;
     }
 
+    colorFormat = def.format.video.eColorFormat;
+    if(colorFormat == OMX_COLOR_FormatYUV420SemiPlanar) {
+        colorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YCbCr_420_SP;
+    }
+
     err = native_window_set_buffers_geometry(
             mNativeWindow.get(),
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
-            def.format.video.eColorFormat);
+            colorFormat);
 
     if (err != 0) {
         ALOGE("native_window_set_buffers_geometry failed: %s (%d)",
