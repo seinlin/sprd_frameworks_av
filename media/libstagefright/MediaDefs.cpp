@@ -26,6 +26,7 @@ const char *MEDIA_MIMETYPE_VIDEO_AVC = "video/avc";
 const char *MEDIA_MIMETYPE_VIDEO_MPEG4 = "video/mp4v-es";
 const char *MEDIA_MIMETYPE_VIDEO_H263 = "video/3gpp";
 const char *MEDIA_MIMETYPE_VIDEO_MPEG2 = "video/mpeg2";
+const char *MEDIA_MIMETYPE_VIDEO_MJPG = "video/mjpg";
 const char *MEDIA_MIMETYPE_VIDEO_RAW = "video/raw";
 
 const char *MEDIA_MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
@@ -39,6 +40,7 @@ const char *MEDIA_MIMETYPE_AUDIO_VORBIS = "audio/vorbis";
 const char *MEDIA_MIMETYPE_AUDIO_G711_ALAW = "audio/g711-alaw";
 const char *MEDIA_MIMETYPE_AUDIO_G711_MLAW = "audio/g711-mlaw";
 const char *MEDIA_MIMETYPE_AUDIO_RAW = "audio/raw";
+const char *MEDIA_MIMETYPE_AUDIO_IMAADPCM = "audio/ima-adpcm";
 const char *MEDIA_MIMETYPE_AUDIO_FLAC = "audio/flac";
 const char *MEDIA_MIMETYPE_AUDIO_AAC_ADTS = "audio/aac-adts";
 const char *MEDIA_MIMETYPE_AUDIO_MSGSM = "audio/gsm";

@@ -207,6 +207,7 @@ void OMXCodec::findMatchingCodecs(
         index = matchIndex + 1;
 
         const char *componentName = list->getCodecName(matchIndex);
+        ALOGI("findMatchingCodecs, componentName: %s, matchIndex: %d", componentName, matchIndex);
 
         // If a specific codec is requested, skip the non-matching ones.
         if (matchComponentName && strcmp(componentName, matchComponentName)) {
@@ -251,6 +252,14 @@ uint32_t OMXCodec::getComponentQuirks(
     if (list->codecHasQuirk(
                 index, "output-buffers-are-unreadable")) {
         quirks |= kOutputBuffersAreUnreadable;
+    }
+    if (list->codecHasQuirk(
+                index, "defers-output-buffer-allocation")) {
+        quirks |= kDefersOutputBufferAllocation;
+    }
+    if (list->codecHasQuirk(
+                index, "needs-flush-before-disable")) {
+        quirks |= kNeedsFlushBeforeDisable;
     }
 
     return quirks;
@@ -334,7 +343,7 @@ sp<MediaSource> OMXCodec::Create(
             }
         }
 
-        ALOGV("Attempting to allocate OMX node '%s'", componentName);
+        ALOGI("Attempting to allocate OMX node '%s'", componentName);
 
         if (!createEncoder
                 && (quirks & kOutputBuffersAreUnreadable)
@@ -372,7 +381,7 @@ sp<MediaSource> OMXCodec::Create(
                 return codec;
             }
 
-            ALOGV("Failed to configure codec '%s'", componentName);
+            ALOGI("Failed to configure codec '%s'", componentName);
         } else {
 	     ALOGI("Fail  allocated OMX node '%s'", componentName);
 	    }        
@@ -548,6 +557,15 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
 
         setG711Format(numChannels);
+    } else if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_IMAADPCM, mMIME)) {
+        int32_t numChannels;
+        int32_t sampleRate;
+        int32_t blockAlign;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
+        CHECK(meta->findInt32(kKeyBlockAlign, &blockAlign));
+
+        setIMAADPCMFormat(numChannels, sampleRate, blockAlign);
     } else if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_RAW, mMIME)) {
         CHECK(!mIsEncoder);
 
@@ -556,6 +574,20 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
 
         setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
+    } else if((!strncmp(mComponentName, "OMX.sprd.mp3.", 13)) &&
+                (!strcasecmp(MEDIA_MIMETYPE_AUDIO_MPEG, mMIME) ||
+                !strcasecmp(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I, mMIME) ||
+                !strcasecmp(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II, mMIME)) ) {
+        int32_t numChannels;
+        int32_t sampleRate;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
+
+        status_t err = setMP3Format(numChannels, sampleRate);
+        if (err != OK) {
+            CODEC_LOGE("setMP3Format() failed (err = %d)", err);
+            return err;
+        }
     }
 
     if (!strncasecmp(mMIME, "video/", 6)) {
@@ -1207,6 +1239,8 @@ status_t OMXCodec::setVideoOutputFormat(
         compressionFormat = OMX_VIDEO_CodingVP9;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_MPEG2, mime)) {
         compressionFormat = OMX_VIDEO_CodingMPEG2;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_MJPG, mime)) {
+        compressionFormat = OMX_VIDEO_CodingMJPEG;
     } else {
         ALOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
@@ -1597,7 +1631,8 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
 
         if (err != OK) {
             ALOGE("allocate_buffer_with_backup failed");
-            return err;
+            //return err;
+            break;
         }
 
         if (mem != NULL) {
@@ -1625,6 +1660,12 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
 
         CODEC_LOGV("allocated buffer %p on %s port", buffer,
              portIndex == kPortIndexInput ? "input" : "output");
+    }
+
+    if(err != OK) {
+	status_t ret = freeBuffersOnPort(portIndex);
+	CHECK_EQ(ret, (status_t)OK);
+	return err;
     }
 
     if (portIndex == kPortIndexOutput) {
@@ -1819,7 +1860,7 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
         return err;
     }
 
-    CODEC_LOGV("allocating %lu buffers from a native window of size %lu on "
+    CODEC_LOGI("allocating %lu buffers from a native window of size %lu on "
             "output port", def.nBufferCountActual, def.nBufferSize);
 
     // Dequeue buffers and send them to OMX
@@ -2400,7 +2441,9 @@ void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
         {
             CODEC_LOGE("ERROR(0x%08lx, %ld)", data1, data2);
 
-            setState(ERROR);
+	    if(data1!=OMX_ErrorStreamCorrupt){
+              setState(ERROR);
+	    }
             break;
         }
 
@@ -3510,6 +3553,67 @@ status_t OMXCodec::setAACFormat(
 void OMXCodec::setG711Format(int32_t numChannels) {
     CHECK(!mIsEncoder);
     setRawAudioFormat(kPortIndexInput, 8000, numChannels);
+}
+void OMXCodec::setIMAADPCMFormat(int32_t numChannels, int32_t sampleRate, int32_t blockAlign) {
+    CHECK(!mIsEncoder);
+
+    // port definition
+    OMX_PARAM_PORTDEFINITIONTYPE def;
+    InitOMXParams(&def);
+    def.nPortIndex = kPortIndexInput;
+    status_t err = mOMX->getParameter(
+            mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+    CHECK_EQ(err, (status_t)OK);
+    def.format.audio.eEncoding = OMX_AUDIO_CodingIMAADPCM;
+    CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamPortDefinition,
+            &def, sizeof(def)), (status_t)OK);
+
+    // pcm param
+    OMX_AUDIO_PARAM_IMAADPCMTYPE imaadpcmParams;
+    InitOMXParams(&imaadpcmParams);
+    imaadpcmParams.nPortIndex = kPortIndexInput;
+
+    err = mOMX->getParameter(
+            mNode, OMX_IndexParamAudioImaAdpcm, &imaadpcmParams, sizeof(imaadpcmParams));
+
+    CHECK_EQ(err, (status_t)OK);
+
+    imaadpcmParams.nChannels = numChannels;
+    imaadpcmParams.nBitsPerSample = 4;
+    imaadpcmParams.nSampleRate = sampleRate;
+    imaadpcmParams.nBlockAlign = blockAlign;
+
+    err = mOMX->setParameter(
+            mNode, OMX_IndexParamAudioImaAdpcm, &imaadpcmParams, sizeof(imaadpcmParams));
+
+    CHECK_EQ(err, (status_t)OK);
+}
+
+status_t OMXCodec::setMP3Format(int32_t numChannels, int32_t sampleRate) {
+    CHECK(!mIsEncoder);
+
+    if (numChannels > 2) {
+            ALOGW("Number of channels: (%d) \n", numChannels);
+        }
+
+    OMX_AUDIO_PARAM_MP3TYPE type;
+    InitOMXParams(&type);
+    type.nPortIndex = kPortIndexInput;
+
+    type.nChannels = numChannels;
+    type.nSampleRate = sampleRate;
+
+    status_t err = mOMX->setParameter(
+                mNode, OMX_IndexParamAudioMp3, &type, sizeof(type));
+
+        if (err != OK) {
+            CODEC_LOGE("setParameter('OMX_IndexParamAudioMp3') failed "
+                       "(err = %d)",
+                       err);
+            return err;
+        }
+
+    return OK;
 }
 
 void OMXCodec::setImageOutputFormat(
