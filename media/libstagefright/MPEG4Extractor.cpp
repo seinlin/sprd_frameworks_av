@@ -314,6 +314,9 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('a', 'v', 'c', '1'):
             return MEDIA_MIMETYPE_VIDEO_AVC;
 
+        case FOURCC('j', 'p', 'e', 'g'):
+            return MEDIA_MIMETYPE_VIDEO_MJPG;
+
         default:
             CHECK(!"should not be here.");
             return NULL;
@@ -1271,6 +1274,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('H', '2', '6', '3'):
         case FOURCC('h', '2', '6', '3'):
         case FOURCC('a', 'v', 'c', '1'):
+        case FOURCC('j', 'p', 'e', 'g'):
         {
             mHasVideo = true;
 
