@@ -54,7 +54,7 @@ extern const char *MEDIA_MIMETYPE_CONTAINER_MATROSKA;
 extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS;
 extern const char *MEDIA_MIMETYPE_CONTAINER_AVI;
 extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG2PS;
-
+extern const char *MEDIA_MIMETYPE_CONTAINER_FLV;
 extern const char *MEDIA_MIMETYPE_CONTAINER_WVM;
 
 extern const char *MEDIA_MIMETYPE_TEXT_3GPP;

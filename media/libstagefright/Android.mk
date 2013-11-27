@@ -57,6 +57,8 @@ LOCAL_SRC_FILES:=                         \
         avc_utils.cpp                     \
         mp4/FragmentedMP4Parser.cpp       \
         mp4/TrackFragment.cpp             \
+        FLVExtractor.cpp                  \
+        AVIExtractor.cpp                  \
 
 LOCAL_C_INCLUDES:= \
         $(TOP)/frameworks/av/include/media/stagefright/timedtext \

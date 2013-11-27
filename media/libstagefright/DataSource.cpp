@@ -32,8 +32,9 @@
 #include "include/OggExtractor.h"
 #include "include/WAVExtractor.h"
 #include "include/WVMExtractor.h"
-
+#include "include/FLVExtractor.h"
 #include "matroska/MatroskaExtractor.h"
+#include "include/AVIExtractor.h"
 
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/DataSource.h>
@@ -157,8 +158,10 @@ void DataSource::RegisterDefaultSniffers() {
     RegisterSniffer(SniffMPEG2TS);
     RegisterSniffer(SniffMP3);
     RegisterSniffer(SniffAAC);
+    RegisterSniffer(SniffAVI);
     RegisterSniffer(SniffMPEG2PS);
     RegisterSniffer(SniffWVM);
+    RegisterSniffer(SniffFLV);
 
     char value[PROPERTY_VALUE_MAX];
     if (property_get("drm.service.enabled", value, NULL)
