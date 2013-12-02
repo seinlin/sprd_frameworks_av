@@ -21,7 +21,6 @@
 #include "OMXMaster.h"
 
 #include "SoftOMXPlugin.h"
-#include "SprdOMXPlugin.h"
 
 #include <dlfcn.h>
 
@@ -33,7 +32,6 @@ OMXMaster::OMXMaster()
     : mVendorLibHandle(NULL) {
     addVendorPlugin();
     addPlugin(new SoftOMXPlugin);
-    addPlugin(new SprdOMXPlugin);
 }
 
 OMXMaster::~OMXMaster() {
