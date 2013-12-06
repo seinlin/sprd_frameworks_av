@@ -16,7 +16,7 @@
 */
 
 #define LOG_TAG "CameraService"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -49,7 +49,7 @@ namespace android {
 // ----------------------------------------------------------------------------
 // Logging support -- this is for debugging only
 // Use "adb shell dumpsys media.camera -v 1" to change it.
-volatile int32_t gLogLevel = 0;
+volatile int32_t gLogLevel = 2;
 
 #define LOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define LOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);

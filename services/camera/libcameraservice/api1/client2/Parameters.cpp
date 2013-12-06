@@ -772,7 +772,7 @@ status_t Parameters::initialize(const CameraMetadata *info) {
             0);
 
     params.set(CameraParameters::KEY_VIDEO_FRAME_FORMAT,
-            CameraParameters::PIXEL_FORMAT_ANDROID_OPAQUE);
+            CameraParameters::PIXEL_FORMAT_YUV420SP);
 
     recordingHint = false;
     params.set(CameraParameters::KEY_RECORDING_HINT,
@@ -826,6 +826,7 @@ status_t Parameters::initialize(const CameraMetadata *info) {
         zslMode = true;
     }
 
+	zslMode = false;
     lightFx = LIGHTFX_NONE;
 
     state = STOPPED;

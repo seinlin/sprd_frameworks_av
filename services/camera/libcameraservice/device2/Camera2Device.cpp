@@ -16,7 +16,7 @@
 
 #define LOG_TAG "Camera2-Device"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 //#define LOG_NNDEBUG 0  // Per-frame verbose logging
 
 #ifdef LOG_NNDEBUG
@@ -705,7 +705,13 @@ status_t Camera2Device::MetadataQueue::dequeue(camera_metadata_t **buf,
 
     *buf = b;
     mCount--;
-
+#if 1//this modification for notivce to HAL when change camera menu setting
+    if (mStreamSlotCount == 1)//for consumer
+    {
+        mStreamSlotCount--;//for test
+        mStreamSlot.erase(mStreamSlot.begin());
+    }
+#endif
     return OK;
 }
 
@@ -1095,6 +1101,7 @@ status_t Camera2Device::StreamAdapter::connectToDevice(
                 " buffer count for stream %d", __FUNCTION__, mId);
         return res;
     }
+
     mMaxConsumerBuffers = maxConsumerBuffers;
 
     ALOGV("%s: Consumer wants %d buffers", __FUNCTION__,
