@@ -826,7 +826,6 @@ status_t Parameters::initialize(const CameraMetadata *info) {
         zslMode = true;
     }
 
-	zslMode = false;
     lightFx = LIGHTFX_NONE;
 
     state = STOPPED;
