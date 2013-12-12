@@ -105,15 +105,23 @@ public:
     /** Set the ANativeWindow to which preview frames are sent */
     status_t setPreviewWindow(const sp<ANativeWindow>& buf)
     {
+        // modify for bug 250864.
+        status_t rc= OK;
         ALOGV("%s(%s) buf %p", __FUNCTION__, mName.string(), buf.get());
 
         if (mDevice->ops->set_preview_window) {
-            mPreviewWindow = buf;
+            // modify for bug 250864.
+            if(buf != 0) {
+                mPreviewWindow = buf;
+            }
             mHalPreviewWindow.user = this;
             ALOGV("%s &mHalPreviewWindow %p mHalPreviewWindow.user %p", __FUNCTION__,
                     &mHalPreviewWindow, mHalPreviewWindow.user);
-            return mDevice->ops->set_preview_window(mDevice,
+            // modify for bug 250864.
+            rc = mDevice->ops->set_preview_window(mDevice,
                     buf.get() ? &mHalPreviewWindow.nw : 0);
+            mPreviewWindow = buf;
+            return rc;
         }
         return INVALID_OPERATION;
     }
