@@ -38,6 +38,7 @@ enum {
     WAVE_FORMAT_PCM        = 0x0001,
     WAVE_FORMAT_ALAW       = 0x0006,
     WAVE_FORMAT_MULAW      = 0x0007,
+    WAVE_FORMAT_IMAADPCM   = 0x0011,
     WAVE_FORMAT_MSGSM      = 0x0031,
     WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 };
@@ -58,6 +59,7 @@ struct WAVSource : public MediaSource {
             const sp<DataSource> &dataSource,
             const sp<MetaData> &meta,
             uint16_t waveFormat,
+            int32_t blockAlign,
             int32_t bitsPerSample,
             off64_t offset, size_t size);
 
@@ -79,6 +81,7 @@ private:
     uint16_t mWaveFormat;
     int32_t mSampleRate;
     int32_t mNumChannels;
+    int32_t mBlockAlign;
     int32_t mBitsPerSample;
     off64_t mOffset;
     size_t mSize;
@@ -123,7 +126,7 @@ sp<MediaSource> WAVExtractor::getTrack(size_t index) {
 
     return new WAVSource(
             mDataSource, mTrackMeta,
-            mWaveFormat, mBitsPerSample, mDataOffset, mDataSize);
+            mWaveFormat, mBlockAlign, mBitsPerSample, mDataOffset, mDataSize);
 }
 
 sp<MetaData> WAVExtractor::getTrackMetaData(
@@ -179,6 +182,7 @@ status_t WAVExtractor::init() {
             if (mWaveFormat != WAVE_FORMAT_PCM
                     && mWaveFormat != WAVE_FORMAT_ALAW
                     && mWaveFormat != WAVE_FORMAT_MULAW
+                    && mWaveFormat != WAVE_FORMAT_IMAADPCM
                     && mWaveFormat != WAVE_FORMAT_MSGSM
                     && mWaveFormat != WAVE_FORMAT_EXTENSIBLE) {
                 return ERROR_UNSUPPORTED;
@@ -210,12 +214,18 @@ status_t WAVExtractor::init() {
                 return ERROR_MALFORMED;
             }
 
+            mBlockAlign = U16_LE_AT(&formatSpec[12]);
+
             mBitsPerSample = U16_LE_AT(&formatSpec[14]);
 
             if (mWaveFormat == WAVE_FORMAT_PCM
                     || mWaveFormat == WAVE_FORMAT_EXTENSIBLE) {
                 if (mBitsPerSample != 8 && mBitsPerSample != 16
                     && mBitsPerSample != 24) {
+                    return ERROR_UNSUPPORTED;
+                }
+            } else if (mWaveFormat == WAVE_FORMAT_IMAADPCM) {
+                if (mBitsPerSample != 4 || mBlockAlign <= 4 || mBlockAlign % (mNumChannels * 4) != 0) {
                     return ERROR_UNSUPPORTED;
                 }
             } else if (mWaveFormat == WAVE_FORMAT_MSGSM) {
@@ -272,11 +282,17 @@ status_t WAVExtractor::init() {
                 }
             }
 
+            // fix wrong BLockAligns in case
+            if (mWaveFormat != WAVE_FORMAT_IMAADPCM) {
+                mBlockAlign = mNumChannels * ((mBitsPerSample + 7) >> 3);
+            }
+
             mValidFormat = true;
         } else if (!memcmp(chunkHeader, "data", 4)) {
             if (mValidFormat) {
                 mDataOffset = offset;
                 mDataSize = chunkSize;
+                mDataSize = mDataSize / mBlockAlign * mBlockAlign;
 
                 mTrackMeta = new MetaData;
 
@@ -288,6 +304,11 @@ status_t WAVExtractor::init() {
                     case WAVE_FORMAT_ALAW:
                         mTrackMeta->setCString(
                                 kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_ALAW);
+                        break;
+                    case WAVE_FORMAT_IMAADPCM:
+                        mTrackMeta->setCString(
+                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_IMAADPCM);
+                        mTrackMeta->setInt32(kKeyBlockAlign, mBlockAlign);
                         break;
                     case WAVE_FORMAT_MSGSM:
                         mTrackMeta->setCString(
@@ -305,7 +326,10 @@ status_t WAVExtractor::init() {
                 mTrackMeta->setInt32(kKeySampleRate, mSampleRate);
 
                 int64_t durationUs = 0;
-                if (mWaveFormat == WAVE_FORMAT_MSGSM) {
+                if (mWaveFormat == WAVE_FORMAT_IMAADPCM) {
+                    int samples_per_frame = ((mBlockAlign / mNumChannels - 4) << 1) + 1;
+                    durationUs = 1000000LL * (mDataSize / mBlockAlign) * samples_per_frame / mSampleRate;
+                } else if (mWaveFormat == WAVE_FORMAT_MSGSM) {
                     // 65 bytes decode to 320 8kHz samples
                     durationUs =
                         1000000LL * (mDataSize / 65 * 320) / 8000;
@@ -334,6 +358,7 @@ WAVSource::WAVSource(
         const sp<DataSource> &dataSource,
         const sp<MetaData> &meta,
         uint16_t waveFormat,
+        int32_t blockAlign,
         int32_t bitsPerSample,
         off64_t offset, size_t size)
     : mDataSource(dataSource),
@@ -341,6 +366,7 @@ WAVSource::WAVSource(
       mWaveFormat(waveFormat),
       mSampleRate(0),
       mNumChannels(0),
+      mBlockAlign(blockAlign),
       mBitsPerSample(bitsPerSample),
       mOffset(offset),
       mSize(size),
@@ -362,6 +388,7 @@ status_t WAVSource::start(MetaData *params) {
     ALOGV("WAVSource::start");
 
     CHECK(!mStarted);
+    CHECK(mBlockAlign<=kMaxFrameSize);
 
     mGroup = new MediaBufferGroup;
     mGroup->add_buffer(new MediaBuffer(kMaxFrameSize));
@@ -406,7 +433,10 @@ status_t WAVSource::read(
     if (options != NULL && options->getSeekTo(&seekTimeUs, &mode)) {
         int64_t pos = 0;
 
-        if (mWaveFormat == WAVE_FORMAT_MSGSM) {
+        if (mWaveFormat == WAVE_FORMAT_IMAADPCM) {
+            int samples_per_frame = ((mBlockAlign / mNumChannels - 4) << 1) + 1;
+            pos = (seekTimeUs * mSampleRate) / 1000000 / samples_per_frame * mBlockAlign;
+        } else if (mWaveFormat == WAVE_FORMAT_MSGSM) {
             // 65 bytes decode to 320 8kHz samples
             int64_t samplenumber = (seekTimeUs * mSampleRate) / 1000000;
             int64_t framenumber = samplenumber / 320;
@@ -439,7 +469,9 @@ status_t WAVSource::read(
         maxBytesToRead = maxBytesAvailable;
     }
 
-    if (mWaveFormat == WAVE_FORMAT_MSGSM) {
+    if (mWaveFormat == WAVE_FORMAT_IMAADPCM) {
+        maxBytesToRead = mBlockAlign;
+    } else if (mWaveFormat == WAVE_FORMAT_MSGSM) {
         // Microsoft packs 2 frames into 65 bytes, rather than using separate 33-byte frames,
         // so read multiples of 65, and use smaller buffers to account for ~10:1 expansion ratio
         if (maxBytesToRead > 1024) {
@@ -506,7 +538,10 @@ status_t WAVSource::read(
 
     int64_t timeStampUs = 0;
 
-    if (mWaveFormat == WAVE_FORMAT_MSGSM) {
+    if (mWaveFormat == WAVE_FORMAT_IMAADPCM) {
+        int samples_per_frame = ((mBlockAlign / mNumChannels - 4) << 1) + 1;
+        timeStampUs = 1000000LL * ((mCurrentPos - mOffset) / mBlockAlign) * samples_per_frame / mSampleRate;
+    } else if (mWaveFormat == WAVE_FORMAT_MSGSM) {
         timeStampUs = 1000000LL * (mCurrentPos - mOffset) * 320 / 65 / mSampleRate;
     } else {
         size_t bytesPerSample = mBitsPerSample >> 3;

@@ -49,6 +49,7 @@ private:
     uint16_t mNumChannels;
     uint32_t mChannelMask;
     uint32_t mSampleRate;
+    uint16_t mBlockAlign;
     uint16_t mBitsPerSample;
     off64_t mDataOffset;
     size_t mDataSize;
