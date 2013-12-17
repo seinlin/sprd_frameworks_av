@@ -289,8 +289,11 @@ status_t CameraClient::setPreviewWindow(const sp<IBinder>& binder,
             native_window_set_scaling_mode(window.get(),
                     NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
             native_window_set_buffers_transform(window.get(), mOrientation);
-            result = mHardware->setPreviewWindow(window);
+            // modify for bug 250864.
+            // result = mHardware->setPreviewWindow(window);
         }
+        // modify for bug 250864.
+        result = mHardware->setPreviewWindow(window);
     }
 
     if (result == NO_ERROR) {
