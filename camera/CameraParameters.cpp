@@ -172,6 +172,27 @@ const char CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE[] = "continuous-pictu
 const char CameraParameters::LIGHTFX_LOWLIGHT[] = "low-light";
 const char CameraParameters::LIGHTFX_HDR[] = "high-dynamic-range";
 
+#ifdef ANDROID_FRAMEWORKS_CAMERA_SPRD
+// Values for brightness setting
+const char CameraParameters::KEY_BRIGHTNESS[] = "brightness";
+const char CameraParameters::KEY_SUPPORTED_BRIGHTNESS[] = "brightness-values";
+
+// Values for contrast settings.
+const char CameraParameters::KEY_CONTRAST[] = "contrast";
+const char CameraParameters::KEY_SUPPORTED_CONTRAST[] = "contrast-values";
+
+//Values for saturation settings.
+const char CameraParameters::KEY_SATURATION[] = "saturation";
+const char CameraParameters::KEY_SUPPORTED_SATURATION[] = "saturation-values";
+
+//Values for iso settings.
+const char CameraParameters::KEY_ISO[] = "iso";
+const char CameraParameters::KEY_SUPPORTED_ISO[] = "iso-values";
+
+//Values for smile_snap settings.
+const char CameraParameters::KEY_SMILE_SNAP_MODE[] = "smile_snap_mode";
+#endif
+
 CameraParameters::CameraParameters()
                 : mMap()
 {

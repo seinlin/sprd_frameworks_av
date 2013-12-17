@@ -4,6 +4,8 @@ include $(CLEAR_VARS)
 
 LOCAL_PATH := $(CAMERA_CLIENT_LOCAL_PATH)
 
+LOCAL_CFLAGS += -DANDROID_FRAMEWORKS_CAMERA_SPRD
+
 LOCAL_SRC_FILES:= \
 	Camera.cpp \
 	CameraMetadata.cpp \

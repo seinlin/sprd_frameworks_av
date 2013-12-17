@@ -674,6 +674,35 @@ public:
     // High-dynamic range mode
     static const char LIGHTFX_HDR[];
 
+#ifdef ANDROID_FRAMEWORKS_CAMERA_SPRD
+    // The camera string.
+    // Example value: "1". Read/write.
+    static const char KEY_BRIGHTNESS[];
+
+    // Supported the camera strings.
+    // Example value: "0,1,2,3,4,5,6". Read only.
+    static const char KEY_SUPPORTED_BRIGHTNESS[];
+
+    // The camera string.
+    // Example value: "1". Read/write.
+    static const char KEY_CONTRAST[];
+
+    // Supported the camera strings.
+    // Example value: "0,1,2,3,4,5,6". Read only.
+    static const char KEY_SUPPORTED_CONTRAST[];
+
+   // Current saturation settings.
+    static const char KEY_SATURATION[];
+    static const char KEY_SUPPORTED_SATURATION[];
+
+    // Current iso settings.
+    static const char KEY_ISO[];
+    static const char KEY_SUPPORTED_ISO[];
+
+    // Current smile_snap settings.
+    static const char KEY_SMILE_SNAP_MODE[];
+#endif
+
 private:
     DefaultKeyedVector<String8,String8>    mMap;
 };
