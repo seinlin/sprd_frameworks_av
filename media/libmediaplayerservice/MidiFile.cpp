@@ -219,6 +219,10 @@ status_t MidiFile::start()
         updateState();
     }
 
+    if (mState == EAS_STATE_STOPPED) {
+        EAS_Locate(mEasData, mEasHandle, 0, false);
+    }
+
     mRender = true;
     if (mState == EAS_STATE_PLAY) {
         sendEvent(MEDIA_STARTED);
