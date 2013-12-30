@@ -332,11 +332,14 @@ void SoftAMR::onQueueFilled(OMX_U32 portIndex) {
 
             if (static_cast<size_t>(numBytesRead) > inHeader->nFilledLen) {
                 // This is bad, should never have happened, but did. Abort now.
-
+#if 1
+                numBytesRead = inHeader->nFilledLen;
+#else
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
 
                 return;
+#endif
             }
         } else {
             int16 mode = ((inputPtr[0] >> 3) & 0x0f);

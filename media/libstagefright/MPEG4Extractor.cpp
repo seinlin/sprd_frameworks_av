@@ -3146,6 +3146,11 @@ status_t MPEG4Source::read(
                     mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample);
 
         if (err != OK) {
+            if (err == ERROR_OUT_OF_RANGE) {
+                err = ERROR_END_OF_STREAM;
+            }
+            ALOGV("end of stream");
+
             return err;
         }
 
