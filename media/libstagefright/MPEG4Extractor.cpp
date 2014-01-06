@@ -303,6 +303,9 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('s', 'a', 'w', 'b'):
             return MEDIA_MIMETYPE_AUDIO_AMR_WB;
 
+        case FOURCC('.', 'm', 'p', '3'):
+            return MEDIA_MIMETYPE_AUDIO_MPEG;
+
         case FOURCC('m', 'p', '4', 'v'):
             return MEDIA_MIMETYPE_VIDEO_MPEG4;
 
@@ -1225,6 +1228,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('e', 'n', 'c', 'a'):
         case FOURCC('s', 'a', 'm', 'r'):
         case FOURCC('s', 'a', 'w', 'b'):
+        case FOURCC('.', 'm', 'p', '3'):
         {
             uint8_t buffer[8 + 20];
             if (chunk_data_size < (ssize_t)sizeof(buffer)) {
@@ -2250,13 +2254,19 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
     if (esds.getObjectTypeIndication(&objectTypeIndication) != OK) {
         return ERROR_MALFORMED;
     }
-
+    ALOGV("MPEG4Extractor audio objectTypeIndication %d",objectTypeIndication);
     if (objectTypeIndication == 0xe1) {
         // This isn't MPEG4 audio at all, it's QCELP 14k...
         mLastTrack->meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_QCELP);
         return OK;
     }
+    if ((objectTypeIndication == 0x6b) || (objectTypeIndication == 0x69)) {
+        //mp3 sprd
+        mLastTrack->meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+        return OK;
+    }
 
+/*
     if (objectTypeIndication  == 0x6b) {
         // The media subtype is MP3 audio
         // Our software MP3 audio decoder may not be able to handle
@@ -2264,6 +2274,7 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         ALOGE("MP3 track in MP4/3GPP file is not supported");
         return ERROR_UNSUPPORTED;
     }
+*/
 
     const uint8_t *csd;
     size_t csd_size;
