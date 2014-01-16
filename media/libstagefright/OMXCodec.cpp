@@ -551,10 +551,11 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         // These are PCM-like formats with a fixed sample rate but
         // a variable number of channels.
 
-        int32_t numChannels;
+        int32_t numChannels, sampleRate;
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
 
-        setG711Format(numChannels);
+        setG711Format(numChannels, sampleRate);
     } else if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_IMAADPCM, mMIME)) {
         int32_t numChannels;
         int32_t sampleRate;
@@ -3533,9 +3534,9 @@ status_t OMXCodec::setAACFormat(
     return OK;
 }
 
-void OMXCodec::setG711Format(int32_t numChannels) {
+void OMXCodec::setG711Format(int32_t numChannels, int32_t sampleRate) {
     CHECK(!mIsEncoder);
-    setRawAudioFormat(kPortIndexInput, 8000, numChannels);
+    setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
 }
 void OMXCodec::setIMAADPCMFormat(int32_t numChannels, int32_t sampleRate, int32_t blockAlign) {
     CHECK(!mIsEncoder);

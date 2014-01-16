@@ -47,6 +47,7 @@ private:
 
     bool mIsMLaw;
     OMX_U32 mNumChannels;
+    OMX_U32 mSamplingRate;
     bool mSignalledError;
 
     void initPorts();
