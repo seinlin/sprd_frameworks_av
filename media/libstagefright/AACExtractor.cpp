@@ -174,7 +174,8 @@ AACExtractor::AACExtractor(
     if (mDataSource->getSize(&streamSize) == OK) {
          while (offset < streamSize) {
             if ((frameSize = getAdtsFrameLength(source, offset, NULL)) == 0) {
-                return;
+                ALOGI("corrupt data at %d(%d)", (int)offset, (int)streamSize);
+                break;
             }
 
             mOffsetVector.push(offset);
@@ -290,6 +291,11 @@ status_t AACSource::read(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+        int64_t duration;
+        if( mMeta->findInt64(kKeyDuration, &duration) ) {
+                    seekTimeUs =  (seekTimeUs >= duration) ? (duration - (mFrameDurationUs<<2)) : seekTimeUs;
+        }
+
         if (mFrameDurationUs > 0) {
             int64_t seekFrame = seekTimeUs / mFrameDurationUs;
             mCurrentTimeUs = seekFrame * mFrameDurationUs;
