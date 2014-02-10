@@ -95,6 +95,7 @@ public:
 
 protected:
     void convertValues(uint32_t encoding);
+    void convertValues(uint32_t encoding, int i);//convert mValues->getEntry(i) to utf8
 
 protected:
     // cached name and value strings, for native encoding support.
