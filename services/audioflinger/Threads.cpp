@@ -3095,6 +3095,17 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
                 // read original volumes with volume control
                 float typeVolume = mStreamTypes[track->streamType()].volume;
+                // It is special case to close codec AMP for power consumption.
+                // set codec mute via hal. only STREAM_MUSIC and only one active track to be handled.
+                if (mOutput && mOutput->hwDev()) {
+                    if (mOutput->hwDev()->set_master_mute) {
+                        if (count == 1 && track->streamType() == AUDIO_STREAM_MUSIC)
+                            mOutput->hwDev()->set_master_mute(mOutput->hwDev(), typeVolume == 0.0);
+                        else
+                            mOutput->hwDev()->set_master_mute(mOutput->hwDev(), false);
+                    }
+                }
+
                 float v = masterVolume * typeVolume;
                 AudioTrackServerProxy *proxy = track->mAudioTrackServerProxy;
                 uint32_t vlr = proxy->getVolumeLR();
