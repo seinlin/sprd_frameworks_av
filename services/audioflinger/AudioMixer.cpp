@@ -1125,7 +1125,10 @@ void AudioMixer::process__genericNoResampling(state_t* state, int64_t pts)
         // t.in == NULL can happen if the track was flushed just after having
         // been enabled for mixing.
         if (t.in == NULL)
+        {
             enabledTracks &= ~(1<<i);
+            memset(t.mainBuffer,0,state->frameCount * sizeof(int16_t) * MAX_NUM_CHANNELS);
+        }
     }
 
     e0 = enabledTracks;
