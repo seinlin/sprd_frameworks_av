@@ -190,6 +190,7 @@ NuCachedSource2::NuCachedSource2(
       mLastAccessPos(0),
       mFetching(true),
       mLastFetchTimeUs(-1),
+      mCancelRead(false),//SPRD http anr
       mNumRetriesLeft(kMaxNumRetries),
       mHighwaterThresholdBytes(kDefaultHighWaterThreshold),
       mLowwaterThresholdBytes(kDefaultLowWaterThreshold),
@@ -413,7 +414,9 @@ void NuCachedSource2::onRead(const sp<AMessage> &msg) {
     size_t size;
     CHECK(msg->findSize("size", &size));
 
-    ssize_t result = readInternal(offset, data, size);
+    //ssize_t result = readInternal(offset, data, size); //SPRD removed
+    //SPRD :http anr
+    ssize_t result = mCancelRead?-1:readInternal(offset, data, size);
 
     if (result == -EAGAIN) {
         msg->post(50000);
@@ -460,6 +463,15 @@ void NuCachedSource2::restartPrefetcherIfNecessary_l(
     ALOGI("restarting prefetcher, totalSize = %d", mCache->totalSize());
     mFetching = true;
 }
+
+/** SPRD : http anr ,cancel read operation @{*/
+void NuCachedSource2::cancelRead(bool allowRead){
+    mCancelRead = allowRead;
+    if(mSource != NULL){
+       mSource->cancelRead(mCancelRead);
+    }
+}
+/** SPRD : @}*/
 
 ssize_t NuCachedSource2::readAt(off64_t offset, void *data, size_t size) {
     Mutex::Autolock autoSerializer(mSerializer);

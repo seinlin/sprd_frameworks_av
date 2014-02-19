@@ -37,6 +37,7 @@ ChromiumHTTPDataSource::ChromiumHTTPDataSource(uint32_t flags)
       mIOResult(OK),
       mContentSize(-1),
       mDecryptHandle(NULL),
+      mCancelRead(false),//SPRD :http anr
       mDrmManagerClient(NULL) {
     mDelegate->setOwner(this);
 }
@@ -161,6 +162,15 @@ status_t ChromiumHTTPDataSource::initCheck() const {
 
     return mState == CONNECTED ? OK : NO_INIT;
 }
+
+/** SPRD: http anr @{*/
+void ChromiumHTTPDataSource::cancelRead(bool force){
+    mCancelRead = force;
+    if(mDelegate != NULL){
+       mDelegate->cancelRead(mCancelRead);
+     }
+}
+/** SPRD: @}*/
 
 ssize_t ChromiumHTTPDataSource::readAt(off64_t offset, void *data, size_t size) {
     Mutex::Autolock autoLock(mLock);

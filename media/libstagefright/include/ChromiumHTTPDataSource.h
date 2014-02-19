@@ -38,6 +38,8 @@ struct ChromiumHTTPDataSource : public HTTPBase {
     virtual void disconnect();
 
     virtual status_t initCheck() const;
+    //SPRD :http anr
+    virtual void cancelRead(bool force);
 
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
     virtual status_t getSize(off64_t *size);
@@ -94,6 +96,8 @@ private:
 
     sp<DecryptHandle> mDecryptHandle;
     DrmManagerClient *mDrmManagerClient;
+    //SPRD :http anr
+    bool  mCancelRead;
 
     void disconnect_l();
 

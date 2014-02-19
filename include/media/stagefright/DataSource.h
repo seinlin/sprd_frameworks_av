@@ -64,7 +64,8 @@ public:
     virtual uint32_t flags() {
         return 0;
     }
-
+    //SPRD :http anr
+    virtual void cancelRead(bool force) {}
     virtual status_t reconnectAtOffset(off64_t offset) {
         return ERROR_UNSUPPORTED;
     }

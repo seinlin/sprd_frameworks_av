@@ -238,6 +238,7 @@ SfDelegate::SfDelegate()
       mNumBytesRead(0),
       mNumBytesTotal(0),
       mDataDestination(NULL),
+      mCancelRead(false),//SPRD :http anr
       mAtEOS(false) {
     InitializeNetworkThreadIfNecessary();
 }
@@ -389,6 +390,12 @@ void SfDelegate::OnReadCompleted(net::URLRequest *request, int bytes_read) {
 
     readMore(request);
 }
+/** SPRD :http anr @{*/
+void SfDelegate::cancelRead(bool force){
+   mCancelRead = force;
+   mOwner->onReadCompleted(ERROR_IO);
+}
+/** SRPD : @}*/
 
 void SfDelegate::readMore(net::URLRequest *request) {
     while (mNumBytesRead < mNumBytesTotal) {
@@ -397,6 +404,13 @@ void SfDelegate::readMore(net::URLRequest *request) {
             copy = mReadBuffer->size();
         }
 
+        /** SPRD:http anr @{*/
+        if(mCancelRead){
+            /* cancel the data download, let us think it is i/o exception*/
+            mOwner->onReadCompleted(ERROR_IO);
+            return;
+        }
+        /** SPRD: @}*/
         int n;
         if (request->Read(mReadBuffer, copy, &n)) {
             MY_LOGV(StringPrintf("Read %d bytes directly.", n).c_str());

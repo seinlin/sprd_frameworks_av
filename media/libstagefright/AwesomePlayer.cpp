@@ -226,6 +226,8 @@ AwesomePlayer::AwesomePlayer()
     mAudioTearDownEvent = new AwesomeEvent(this,
                               &AwesomePlayer::onAudioTearDownEvent);
     mAudioTearDownEventPending = false;
+    //SPRD: http anr
+    initUIOperateQueue();
 
     reset();
 }
@@ -245,7 +247,10 @@ void AwesomePlayer::cancelPlayerEvents(bool keepNotifications) {
     mVideoEventPending = false;
     mQueue.cancelEvent(mVideoLagEvent->eventID());
     mVideoLagEventPending = false;
-
+    /**SPRD: http anr @{*/
+    mQueue.cancelEvent(mScheduleUIOperateEvent->eventID());
+    mScheduleUIOperateEventPending = false;
+    /**SPRD: @}*/
     if (mOffloadAudio) {
         mQueue.cancelEvent(mAudioTearDownEvent->eventID());
         mAudioTearDownEventPending = false;
@@ -484,6 +489,14 @@ status_t AwesomePlayer::setDataSource_l(const sp<MediaExtractor> &extractor) {
 }
 
 void AwesomePlayer::reset() {
+	/** SPRD: http anr @{*/
+    if(mCachedSource != NULL){
+       /*In the case of a networked data, disconnect the download
+          data operation,to prevent the read operation is blocked, which
+          may result in an interlock */
+      mCachedSource->cancelRead(true);
+    }
+    /** SPRD: @}*/
     Mutex::Autolock autoLock(mLock);
     reset_l();
 }
@@ -493,6 +506,8 @@ void AwesomePlayer::reset_l() {
     mActiveAudioTrackIndex = -1;
     mDisplayWidth = 0;
     mDisplayHeight = 0;
+    //SPRD: http anr
+    mOperateStatus = KSTAT_IDLE;
 
     notifyListener_l(MEDIA_STOPPED);
 
@@ -883,18 +898,21 @@ void AwesomePlayer::onStreamDone() {
 
 status_t AwesomePlayer::play() {
     ATRACE_CALL();
-
+    /** SPRD: removed @{
     Mutex::Autolock autoLock(mLock);
 
     modifyFlags(CACHE_UNDERRUN, CLEAR);
 
     return play_l();
+    /** SPRD @}*/
+    return play_ui();
 }
 
 status_t AwesomePlayer::play_l() {
     modifyFlags(SEEK_PREVIEW, CLEAR);
 
     if (mFlags & PLAYING) {
+        if(mOperateStatus == KSTAT_PLAYING)mOperateStatus = KSTAT_IDLE;
         return OK;
     }
 
@@ -909,6 +927,7 @@ status_t AwesomePlayer::play_l() {
     }
 
     modifyFlags(PLAYING, SET);
+    if(mOperateStatus == KSTAT_PLAYING)mOperateStatus = KSTAT_IDLE;
     modifyFlags(FIRST_FRAME, SET);
 
     if (mDecryptHandle != NULL) {
@@ -1220,15 +1239,20 @@ void AwesomePlayer::initRenderer_l() {
 status_t AwesomePlayer::pause() {
     ATRACE_CALL();
 
+    /**SPRD: removed @{
     Mutex::Autolock autoLock(mLock);
 
     modifyFlags(CACHE_UNDERRUN, CLEAR);
 
     return pause_l();
+    /**SPRD: @}*/
+
+    return pause_ui();
 }
 
 status_t AwesomePlayer::pause_l(bool at_eos) {
     if (!(mFlags & PLAYING)) {
+        if(mOperateStatus == KSTAT_PAUSING)mOperateStatus = KSTAT_IDLE;
         if (mAudioTearDown && mAudioTearDownWasPlaying) {
             ALOGV("pause_l() during teardown and finishSetDataSource_l() mFlags %x" , mFlags);
             mAudioTearDownWasPlaying = false;
@@ -1261,6 +1285,8 @@ status_t AwesomePlayer::pause_l(bool at_eos) {
     }
 
     modifyFlags(PLAYING, CLEAR);
+    //SPRD http anr
+    if(mOperateStatus == KSTAT_PAUSING)mOperateStatus = KSTAT_IDLE;
 
     if (mDecryptHandle != NULL) {
         mDrmManagerClient->setPlaybackStatus(mDecryptHandle,
@@ -1281,6 +1307,9 @@ status_t AwesomePlayer::pause_l(bool at_eos) {
 }
 
 bool AwesomePlayer::isPlaying() const {
+    if(mOperateStatus != KSTAT_IDLE){
+       return mOperateStatus == KSTAT_PLAYING;
+    }
     return (mFlags & PLAYING) || (mFlags & CACHE_UNDERRUN);
 }
 
@@ -1402,12 +1431,15 @@ status_t AwesomePlayer::getPosition(int64_t *positionUs) {
 status_t AwesomePlayer::seekTo(int64_t timeUs) {
     ATRACE_CALL();
 
+    /** SPRD: removed @{
     if (mExtractorFlags & MediaExtractor::CAN_SEEK) {
         Mutex::Autolock autoLock(mLock);
         return seekTo_l(timeUs);
     }
 
     return OK;
+    /** SPRD: @}*/
+    return seekTo_ui(timeUs);
 }
 
 status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
@@ -1768,6 +1800,7 @@ void AwesomePlayer::onVideoEvent() {
         }
         for (;;) {
             status_t err = mVideoSource->read(&mVideoBuffer, &options);
+
             options.clearSeekTo();
 
             if (err != OK) {
@@ -1982,6 +2015,7 @@ void AwesomePlayer::onVideoEvent() {
         MediaSource::ReadOptions options;
         for (;;) {
             status_t err = mVideoSource->read(&mVideoBuffer, &options);
+
             if (err != OK) {
                 // deal with any errors next time
                 CHECK(mVideoBuffer == NULL);
@@ -2921,5 +2955,219 @@ void AwesomePlayer::onAudioTearDownEvent() {
     // Call prepare for the host decoding
     beginPrepareAsync_l();
 }
+/** SPRD: http anr @{*/
+void AwesomePlayer::onScheduleUIOperate(){
+    ATRACE_CALL();
+    {
+       Mutex::Autolock autoLock(mLock);
+
+       if (!mScheduleUIOperateEventPending) {
+          return;
+       }
+       mScheduleUIOperateEventPending = false;
+       postScheduleUIOperate_l(100000);
+    }
+
+    AwesomePlayer::OperateUI i = AwesomePlayer::KAWESIDLE;
+    int64_t argSeekTimeUs = 0;
+    {
+      Mutex::Autolock autoUILock(mUIOperateLock);
+      if(mEventQueue.size() == 0){
+        return ;
+      }
+      Event event = *(mEventQueue.begin());
+
+      if(event.mIndex == AwesomePlayer::KAWESIDLE) return ;
+      i = event.mIndex ;
+      argSeekTimeUs = event.timeUs;
+
+      mEventQueue.erase(mEventQueue.begin());
+      Event eventEmpt ;
+      eventEmpt.mIndex = AwesomePlayer::KAWESIDLE;
+      Event & refEvent = eventEmpt;
+      mEventQueue.push_back(refEvent);
+
+    }
+    status_t  result = OK;
+    switch(i){
+     case AwesomePlayer::KAWESPLAY:
+        result = play_ui(true);
+        break;
+     case AwesomePlayer::KAWESPAUSE:
+        result = pause_ui(true);
+        break;
+     case AwesomePlayer::KAWESSEEK:
+        result = seekTo_ui(argSeekTimeUs,true);
+        break;
+    default:
+        ALOGE("AwesomePlayer::onScheduleUIOperate invild operate %d",i);
+        break;
+    }
+    if(result != OK){
+       ALOGE("AwesomePlayer::onScheduleUIOperate result fail :%d   operate: %d",result,i);
+    }
+}
+
+
+void AwesomePlayer::postScheduleUIOperate_l(int64_t delayUs) {
+    ATRACE_CALL();
+
+    if (mScheduleUIOperateEventPending) {
+        return;
+    }
+
+    mScheduleUIOperateEventPending = true;
+    mQueue.postEventWithDelay(mScheduleUIOperateEvent, delayUs);
+}
+
+status_t AwesomePlayer::play_ui(bool force) {
+    if(needUseQueue()&&(!force)){
+       Mutex::Autolock autoLock(mUIOperateLock);
+       postScheduleUIOperate_l(100000);
+       mInsertEvent.mIndex = AwesomePlayer::KAWESPLAY;
+       this->addUIEvent();
+       mOperateStatus = KSTAT_PLAYING;
+       return OK;
+    }
+    Mutex::Autolock autoLock(mLock);
+    modifyFlags(CACHE_UNDERRUN, CLEAR);
+    return play_l();
+}
+
+status_t AwesomePlayer::pause_ui(bool force) {
+    if(needUseQueue()&&(!force)){
+       Mutex::Autolock autoLock(mUIOperateLock);
+       postScheduleUIOperate_l(100000);
+       mInsertEvent.mIndex = AwesomePlayer::KAWESPAUSE;
+       this->addUIEvent();
+       mOperateStatus = KSTAT_PAUSING;
+       return OK;
+    }
+
+    Mutex::Autolock autoLock(mLock);
+    modifyFlags(CACHE_UNDERRUN, CLEAR);
+    status_t err = pause_l();
+    return err;
+}
+
+status_t AwesomePlayer::seekTo_ui(int64_t timeUs,bool force) {
+    if(needUseQueue()&&(!force)){
+       Mutex::Autolock autoLock(mUIOperateLock);
+       postScheduleUIOperate_l(100000);
+       mInsertEvent.mIndex = AwesomePlayer::KAWESSEEK;
+       mInsertEvent.timeUs = timeUs;
+       this->addUIEvent();
+       mOperateStatus = KSTAT_IDLE;
+       return OK;
+    }
+
+    if (mExtractorFlags & MediaExtractor::CAN_SEEK) {
+        Mutex::Autolock autoLock(mLock);
+        return seekTo_l(timeUs);
+    }
+    return OK;
+}
+
+bool AwesomePlayer::needUseQueue(){
+  return mCachedSource != NULL;
+}
+
+void AwesomePlayer::addUIEvent(){
+     List<Event>::iterator it = mEventQueue.begin();
+     List<Event>::iterator it_End = mEventQueue.end();
+     int32_t len=(*it_End).mIndex;
+     int32_t wgt=(*it).mIndex;
+     int32_t hgt = mInsertEvent.mIndex;
+     CHECK(((len<4)&&(wgt<4)&&(hgt<4)));
+     if(myOper[hgt][len][wgt] == 0){
+       ALOGE(" AwesomePlayer::addUIEvent unkown status:%d %d %d",hgt,len,wgt);
+       return ;
+     }
+     (this->*(myOper[hgt][len][wgt]))();
+}
+
+status_t AwesomePlayer::erase_Hinsert_H(){
+     mEventQueue.erase(mEventQueue.begin());
+     Event& myEvent =mInsertEvent;
+     mEventQueue.push_front(myEvent);
+     return OK;
+}
+status_t AwesomePlayer::erase_Tinsert_T(){
+    mEventQueue.erase(--mEventQueue.end());
+    Event& myEvent =mInsertEvent;
+    mEventQueue.push_back(myEvent);
+    return OK;
+}
+status_t AwesomePlayer::erase_Hinsert_T(){
+    mEventQueue.erase(mEventQueue.begin());
+    Event& myEvent =mInsertEvent;
+    mEventQueue.push_back(myEvent);
+    return OK;
+}
+status_t AwesomePlayer::erase_Tinsert_H(){
+     mEventQueue.erase(--mEventQueue.end());
+     Event& myEvent =mInsertEvent;
+     mEventQueue.push_front(myEvent);
+     return OK;
+}
+
+status_t  AwesomePlayer::erase_H(){
+     mEventQueue.erase(mEventQueue.begin());
+     Event tempEmptyEvent;
+     tempEmptyEvent.mIndex = AwesomePlayer::KAWESIDLE;
+     //tempEmptyEvent.mWhenUs = AwesomePlayer::GetNowUs();
+     Event& myEvent =tempEmptyEvent;
+     mEventQueue.push_back(myEvent);
+     return OK;
+    }
+status_t  AwesomePlayer::erase_T(){
+     mEventQueue.erase(--mEventQueue.end());
+     Event tempEmptyEvent;
+     tempEmptyEvent.mIndex = AwesomePlayer::KAWESIDLE;
+     //tempEmptyEvent.mWhenUs = AwesomePlayer::GetNowUs();
+     Event& myEvent =tempEmptyEvent;
+     mEventQueue.push_back(myEvent);
+     return OK;
+    }
+void AwesomePlayer::initUIOperateQueue(){
+
+    mScheduleUIOperateEvent = new AwesomeEvent(this, &AwesomePlayer::onScheduleUIOperate);
+    mScheduleUIOperateEventPending = false;
+
+    Event eventEmpt ;
+
+    eventEmpt.mIndex = AwesomePlayer::KAWESIDLE;
+    Event & refEvent = eventEmpt;
+    mEventQueue.push_front(refEvent);
+    mEventQueue.push_front(refEvent);
+
+    myOper[0][0][0]=&AwesomePlayer::erase_Hinsert_H;
+
+    myOper[1][0][0]=&AwesomePlayer::erase_Hinsert_H;
+    myOper[2][0][0]=&AwesomePlayer::erase_Hinsert_H;
+    myOper[3][0][0]=&AwesomePlayer::erase_Hinsert_H;
+
+    myOper[1][0][1]=&AwesomePlayer::erase_Hinsert_H;
+    myOper[2][0][1]=&AwesomePlayer::erase_H;
+    myOper[3][0][1]=&AwesomePlayer::erase_Tinsert_H;
+
+    myOper[1][0][2]=&AwesomePlayer::erase_H;
+    myOper[2][0][2]=&AwesomePlayer::erase_Hinsert_H;
+    myOper[3][0][2]=&AwesomePlayer::erase_Tinsert_H;
+
+    myOper[1][0][3]=&AwesomePlayer::erase_Tinsert_T;
+    myOper[2][0][3]=&AwesomePlayer::erase_Tinsert_T;
+    myOper[3][0][3]=&AwesomePlayer::erase_Hinsert_H;
+
+    myOper[1][1][3]=&AwesomePlayer::erase_Tinsert_T;
+    myOper[2][1][3]=&AwesomePlayer::erase_T;
+    myOper[3][1][3]=&AwesomePlayer::erase_Hinsert_H;
+
+    myOper[1][2][3]=&AwesomePlayer::erase_T;
+    myOper[2][2][3]=&AwesomePlayer::erase_Tinsert_T;
+    myOper[3][2][3]=&AwesomePlayer::erase_Hinsert_H;
+}
+
+/** SPRD: @}*/
 
 }  // namespace android

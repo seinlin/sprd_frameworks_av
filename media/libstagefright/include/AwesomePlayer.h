@@ -44,7 +44,6 @@ class DecryptHandle;
 
 class TimedTextDriver;
 struct WVMExtractor;
-
 struct AwesomeRenderer : public RefBase {
     AwesomeRenderer() {}
 
@@ -145,6 +144,7 @@ private:
     Mutex mMiscStateLock;
     mutable Mutex mStatsLock;
     Mutex mAudioLock;
+
 
     OMXClient mClient;
     TimedEventQueue mQueue;
@@ -359,6 +359,55 @@ private:
 
     AwesomePlayer(const AwesomePlayer &);
     AwesomePlayer &operator=(const AwesomePlayer &);
+
+    // sprd add:{ http stream oparete
+    enum OperateUI{
+           KAWESIDLE = 0,
+           KAWESPLAY ,
+           KAWESPAUSE,
+           KAWESSEEK,
+           KAWESINVALID
+    };
+    enum StatesUI {
+           KSTAT_IDLE = 0,
+           KSTAT_SEEKING,
+           KSTAT_PAUSING,
+           KSTAT_PLAYING
+    };
+    bool needUseQueue();
+    status_t play_ui(bool force = false);
+    status_t pause_ui(bool force = false);
+    status_t seekTo_ui(int64_t timeUs,bool force = false);
+    Mutex mUIOperateLock;
+    bool mScheduleUIOperateEventPending;
+    sp<TimedEventQueue::Event>  mScheduleUIOperateEvent;
+
+    void postScheduleUIOperate_l(int64_t delayUs = 0);
+    void onScheduleUIOperate();
+    void initUIOperateQueue();
+    void addUIEvent();
+
+    struct Event {
+        int64_t mWhenUs;
+        OperateUI mIndex ;
+        int64_t timeUs ;
+    };
+    typedef status_t (AwesomePlayer::*MyFunP)();
+    MyFunP myOper[4][4][4];
+    struct Event mInsertEvent;
+    int32_t mOperateStatus;
+
+    //queue operat
+    List<Event> mEventQueue;
+    status_t  erase_Hinsert_H();
+    status_t  erase_Tinsert_T();
+    status_t  erase_Hinsert_T();
+    status_t  erase_Tinsert_H();
+    status_t  erase_H();//eraser_H_insert_empt_T
+    status_t  erase_T();//eraser_T_insert_empt_T
+
+
+// }end
 };
 
 }  // namespace android

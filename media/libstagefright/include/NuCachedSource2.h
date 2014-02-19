@@ -52,6 +52,8 @@ struct NuCachedSource2 : public DataSource {
     size_t approxDataRemaining(status_t *finalStatus) const;
 
     void resumeFetchingIfNecessary();
+    //SPRD:http anr
+    void cancelRead(bool cancelRead);
 
     // The following methods are supported only if the
     // data source is HTTP-based; otherwise, ERROR_UNSUPPORTED
@@ -114,7 +116,8 @@ private:
     int64_t mKeepAliveIntervalUs;
 
     bool mDisconnectAtHighwatermark;
-
+    //SPRD :http anr
+    bool mCancelRead;
     void onMessageReceived(const sp<AMessage> &msg);
     void onFetch();
     void onRead(const sp<AMessage> &msg);

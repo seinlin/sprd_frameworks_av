@@ -92,6 +92,8 @@ struct SfDelegate : public net::URLRequest::Delegate {
     SfDelegate();
     virtual ~SfDelegate();
 
+    //SPRD :http anr
+    void cancelRead(bool force);
     void initiateConnection(
             const char *uri,
             const KeyedVector<String8, String8> *headers,
@@ -146,6 +148,8 @@ private:
     size_t mNumBytesTotal;
     void *mDataDestination;
 
+    // SPRD: http anr
+    bool mCancelRead;
     bool mRangeRequested;
     bool mAtEOS;
 
