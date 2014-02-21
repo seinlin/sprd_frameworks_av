@@ -92,7 +92,7 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
     struct timespec before;
     bool beforeIsValid = false;
     audio_track_cblk_t* cblk = mCblk;
-    bool ignoreInitialPendingInterrupt = true;
+    bool ignoreInitialPendingInterrupt = false;
     // check for shared memory corruption
     if (mIsShutdown) {
         status = NO_INIT;
