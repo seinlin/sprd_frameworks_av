@@ -46,6 +46,8 @@ namespace android {
 #define CBLK_OVERRUN   0x100 // set by server immediately on input overrun, cleared by client
 #define CBLK_INTERRUPT 0x200 // set by client on interrupt(), cleared by client in obtainBuffer()
 #define CBLK_STREAM_END_DONE 0x400 // set by server on render completion, cleared by client
+#define CBLK_FORCEINTERRUPT 0x8000 // force break  and get out of  obtainBuffer
+
 
 //EL_FIXME 20 seconds may not be enough and must be reconciled with new obtainBuffer implementation
 #define MAX_RUN_OFFLOADED_TIMEOUT_MS 20000 //assuming upto a maximum of 20 seconds of offloaded
@@ -235,6 +237,8 @@ public:
 
     // Call to force an obtainBuffer() to return quickly with -EINTR
     void        interrupt();
+
+    void        interruptForce();
 
     size_t      getPosition() {
         return mEpoch + mCblk->mServer;

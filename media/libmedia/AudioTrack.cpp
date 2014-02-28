@@ -146,7 +146,7 @@ AudioTrack::~AudioTrack()
         // Otherwise the callback thread will never exit.
         stop();
         if (mAudioTrackThread != 0) {
-            mProxy->interrupt();
+            mProxy->interruptForce();
             mAudioTrackThread->requestExit();   // see comment in AudioTrack.h
             mAudioTrackThread->requestExitAndWait();
             mAudioTrackThread.clear();

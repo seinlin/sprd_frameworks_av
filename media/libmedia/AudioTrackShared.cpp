@@ -92,14 +92,14 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
     struct timespec before;
     bool beforeIsValid = false;
     audio_track_cblk_t* cblk = mCblk;
-    bool ignoreInitialPendingInterrupt = false;
+    bool ignoreInitialPendingInterrupt = true;
     // check for shared memory corruption
     if (mIsShutdown) {
         status = NO_INIT;
         goto end;
     }
     for (;;) {
-        int32_t flags = android_atomic_and(~CBLK_INTERRUPT, &cblk->mFlags);
+        int32_t flags = android_atomic_and(~(CBLK_INTERRUPT|CBLK_FORCEINTERRUPT), &cblk->mFlags);
         // check for track invalidation by server, or server death detection
         if (flags & CBLK_INVALID) {
             ALOGV("Track invalidated");
@@ -107,7 +107,7 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
             goto end;
         }
         // check for obtainBuffer interrupted by client
-        if (!ignoreInitialPendingInterrupt && (flags & CBLK_INTERRUPT)) {
+        if ((!ignoreInitialPendingInterrupt && (flags & CBLK_INTERRUPT)) || (flags & CBLK_FORCEINTERRUPT)) {
             ALOGV("obtainBuffer() interrupted by client");
             status = -EINTR;
             goto end;
@@ -308,6 +308,16 @@ void ClientProxy::interrupt()
                 1);
     }
 }
+
+void ClientProxy::interruptForce()
+{
+    audio_track_cblk_t* cblk = mCblk;
+    if (!(android_atomic_or(CBLK_FORCEINTERRUPT, &cblk->mFlags) & CBLK_FORCEINTERRUPT)) {
+        (void) __futex_syscall3(&cblk->mFutex, mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE,
+                1);
+    }
+}
+
 
 size_t ClientProxy::getMisalignment()
 {
