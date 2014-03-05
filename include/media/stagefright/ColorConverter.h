@@ -79,6 +79,31 @@ private:
     status_t convertTIYUV420PackedSemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
 
+    status_t convertNV12Tile(
+        size_t width, size_t height,
+        const void *srcBits, size_t srcSkip,
+        void *dstBits, size_t dstSkip);
+
+    size_t nv12TileGetTiledMemBlockNum(
+        size_t bx, size_t by,
+        size_t nbx, size_t nby);
+
+    void nv12TileComputeRGB(
+        uint8_t **dstPtr,const uint8_t *blockUV,
+        const uint8_t *blockY, size_t blockWidth,
+        size_t dstSkip);
+
+    void nv12TileTraverseBlock(
+        uint8_t **dstPtr, const uint8_t *blockY,
+        const uint8_t *blockUV, size_t blockWidth,
+        size_t blockHeight, size_t dstSkip);
+
+    void convertYUV420SemiPlanar32Aligned(
+            size_t width, size_t height,
+            const void *srcBits, size_t srcSkip,
+            void *dstBits, size_t dstSkip,
+            size_t alignedWidth);
+
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);
 };
